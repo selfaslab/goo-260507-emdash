@@ -70,78 +70,6 @@ corepack pnpm dev           # http://localhost:4321
 <img width="931" height="717" alt="quent3" src="https://github.com/user-attachments/assets/7692fadb-2f0b-4051-b821-2fddf57c9060" />
 
 
-## 자동화 파이프라인
-
-관리자는 브라우저에서 **`/admin/automation`** 으로 들어가 한 번에 실행할 수 있습니다. (EmDash 관리자 로그인 세션 필요)
-
-### 1) 뉴스 수집
-
-```bash
-curl http://localhost:4321/api/fetch-news?max=20
-```
-
-NewsAPI(우선) → Finnhub 순으로 시도하고, 키가 모두 없으면 `mockNews` (데모 6건) 가 들어갑니다. 같은 URL은 자동 dedup.
-
-### 2) GPT 분석 + 시그널 재계산
-
-```bash
-curl -X POST http://localhost:4321/api/analyze-news \
-  -H "Content-Type: application/json" -d '{"limit":15}'
-```
-
-`news_items.analyzed=false` 인 항목을 GPT-4o 로 분석해 `target_etf/sentiment/score/importance/reason` 을 채우고, 그 결과를 ETF 단위로 집계해 `signals` 컬렉션에 새 시그널을 생성합니다.
-
-<img width="607" height="820" alt="quent4" src="https://github.com/user-attachments/assets/af1a4a7a-44dd-4928-af5d-d50d473691cd" />
-
-### 3) 블로그 자동 생성
-
-```bash
-curl -X POST http://localhost:4321/api/generate-blog \
-  -H "Content-Type: application/json" -d '{"publish":false}'
-```
-
-분석된 뉴스 묶음 + 최신 시그널을 컨텍스트로 GPT-4o 가 `{title, summary, seoDescription, tags, markdown}` JSON 을 반환하고, 마크다운을 Portable Text 로 변환해 `blog_posts` 에 저장합니다. 기본은 draft. `publish:true` 면 즉시 발행.
-
-`{"etf":"SOXX"}` 처럼 특정 ETF 만 지정해서 1편만 생성할 수도 있습니다.
-
-### 4) 발행 토글
-
-```bash
-curl -X POST http://localhost:4321/api/publish-post \
-  -H "Content-Type: application/json" -d '{"id":"<entry-id>","publish":true}'
-```
-
-### 5) YouTube 추천 영상 (블로그 하단 자동 삽입)
-
-블로그 상세 페이지 (`/blog/[slug]`) 하단에 React island `<RelatedVideosSection client:visible>` 가 자동으로 들어가 있어, 사용자가 스크롤로 시야에 들어올 때 다음 흐름이 일어납니다.
-
-```
-키워드 추출 (GPT or rule-based)
-  → YouTube Data API v3 검색 (최근 30일 / 영어 / 조회수 정렬 / 5건)
-  → GPT 영상 요약 + 감성 + 관련도
-  → skeleton → 카드 그리드 렌더 (다크모드/라이트모드 자동 대응)
-```
-
-수동 호출 / 백필 용도의 API:
-
-```bash
-# 키워드만 직접 넘겨 추천만 받기
-curl 'http://localhost:4321/api/fetch-youtube?keywords=SOXX%20ETF,NVIDIA%20earnings'
-
-# 블로그 컨텍스트로 추출+검색+분석+점수+(선택)EmDash 저장
-curl -X POST http://localhost:4321/api/fetch-youtube \
-  -H "Content-Type: application/json" \
-  -d '{"title":"NVIDIA 실적 호조가 SOXX ETF에 미치는 영향","etf":"SOXX","tickers":["NVDA","TSM"],"persist":true}'
-
-# youtube_videos 컬렉션에서 summary 비어 있는 항목만 GPT 재분석
-curl -X POST http://localhost:4321/api/analyze-youtube \
-  -H "Content-Type: application/json" -d '{"limit":10}'
-```
-
-캐시: 동일 키워드 묶음에 대해 `YOUTUBE_CACHE_TTL_SEC` (기본 15분) 동안 in-memory + single-flight 로 한 번만 호출하므로 quota 가 빠르게 소모되지 않습니다.
-
-키 없을 때: `YOUTUBE_API_KEY` / `OPENAI_API_KEY` 둘 중 어느 것이 비어 있어도 컴포넌트는 죽지 않고 **mock 영상 / rule-based 요약** 으로 폴백합니다.
-
 ## 체크리스트 (PHASE 1 → 9)
 
 - [x] PHASE 1 — EmDash + Astro 설치 (`pnpm bootstrap`)
@@ -193,3 +121,5 @@ src/
 │       └── publish-post.ts
 └── layouts, components, styles, utils  # EmDash blog 템플릿 그대로
 ```
+
+<img width="607" height="820" alt="quent4" src="https://github.com/user-attachments/assets/af1a4a7a-44dd-4928-af5d-d50d473691cd" />v
