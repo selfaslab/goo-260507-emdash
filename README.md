@@ -119,7 +119,6 @@ curl -X POST http://localhost:4321/api/publish-post \
 키워드 추출 (GPT or rule-based)
   → YouTube Data API v3 검색 (최근 30일 / 영어 / 조회수 정렬 / 5건)
   → GPT 영상 요약 + 감성 + 관련도
-  → Video Score = 0.5·KeywordMatch + 0.3·Views + 0.2·Recency
   → skeleton → 카드 그리드 렌더 (다크모드/라이트모드 자동 대응)
 ```
 
@@ -194,5 +193,3 @@ src/
 │       └── publish-post.ts
 └── layouts, components, styles, utils  # EmDash blog 템플릿 그대로
 ```
-
-
