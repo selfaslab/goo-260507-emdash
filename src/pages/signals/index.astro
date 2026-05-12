@@ -1,0 +1,133 @@
+---
+import { getEmDashCollection } from "emdash";
+import Base from "../../layouts/Base.astro";
+import { ETF_TICKERS } from "../../lib/config.ts";
+
+const { entries: signals, cacheHint } = await getEmDashCollection("signals", {
+	orderBy: { created_at: "desc" },
+	limit: 100,
+	status: "published",
+});
+Astro.cache.set(cacheHint);
+
+const byEtf = new Map<string, any[]>();
+for (const s of signals) {
+	const t = (s.data as any).ticker as string;
+	if (!t) continue;
+	const arr = byEtf.get(t) ?? [];
+	arr.push(s);
+	byEtf.set(t, arr);
+}
+
+const labelColor = (label: string) => {
+	if (label === "Strong Buy") return "color:#16a34a;";
+	if (label === "Buy") return "color:#4ade80;";
+	if (label === "Sell") return "color:#f97316;";
+	if (label === "Strong Sell") return "color:#dc2626;";
+	return "color:#94a3b8;";
+};
+function fmt(d: Date | string | null | undefined) {
+	if (!d) return "";
+	const date = d instanceof Date ? d : new Date(d);
+	if (Number.isNaN(date.getTime())) return "";
+	return date.toLocaleString("ko-KR", {
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+}
+---
+
+<Base title="ETF 시그널 대시보드" description="SOXX / SMH / QQQ 의 AI 기반 퀀트 시그널 히스토리.">
+	<section class="page">
+		<header>
+			<h1>ETF 시그널 대시보드</h1>
+			<p>SOXX · SMH · QQQ 에 대한 AI 분석 기반 단기 시그널 히스토리.</p>
+		</header>
+
+		{ETF_TICKERS.map((etf) => {
+			const list = byEtf.get(etf) ?? [];
+			const latest = list[0]?.data as any | undefined;
+			return (
+				<section class="etf-block">
+					<header class="etf-head">
+						<div>
+							<span class="ticker">{etf}</span>
+							<span class="signal-label" style={labelColor(latest?.signal_label ?? "")}>
+								{latest?.signal_label ?? "데이터 없음"}
+							</span>
+						</div>
+						<div class="signal-score">
+							{typeof latest?.score === "number" ? latest.score.toFixed(1) : "—"}
+							<span class="suffix">/ 10</span>
+						</div>
+					</header>
+					{list.length === 0 ? (
+						<p class="empty">분석된 시그널이 없습니다. <code>POST /api/analyze-news</code> 호출 후 다시 확인하세요.</p>
+					) : (
+						<table class="hist">
+							<thead>
+								<tr>
+									<th>시각</th>
+									<th>시그널</th>
+									<th>점수</th>
+									<th>감성</th>
+									<th>빈도</th>
+									<th>모멘텀</th>
+									<th>변동성</th>
+									<th>요약</th>
+								</tr>
+							</thead>
+							<tbody>
+								{list.map((s) => {
+									const d = s.data as any;
+									return (
+										<tr>
+											<td>{fmt(d.generated_at ?? d.createdAt)}</td>
+											<td style={labelColor(d.signal_label ?? "")}>{d.signal_label ?? "—"}</td>
+											<td>{typeof d.score === "number" ? d.score.toFixed(1) : "—"}</td>
+											<td>{typeof d.sentiment_score === "number" ? d.sentiment_score.toFixed(1) : "—"}</td>
+											<td>{typeof d.frequency_score === "number" ? d.frequency_score.toFixed(1) : "—"}</td>
+											<td>{typeof d.momentum_score === "number" ? d.momentum_score.toFixed(1) : "—"}</td>
+											<td>{typeof d.volatility_score === "number" ? d.volatility_score.toFixed(1) : "—"}</td>
+											<td class="summary">{d.summary ?? ""}</td>
+										</tr>
+									);
+								})}
+							</tbody>
+						</table>
+					)}
+				</section>
+			);
+		})}
+
+		<aside class="callout">
+			<strong>점수 공식.</strong> Signal Score = 0.4·Sentiment + 0.2·Frequency + 0.3·Momentum + 0.1·Volatility. 점수 8↑ Strong Buy, 6↑ Buy, 4↑ Neutral, 2↑ Sell, 그 이하 Strong Sell.
+		</aside>
+	</section>
+</Base>
+
+<style>
+	.page { max-width: var(--wide-width); margin: 0 auto; padding: var(--spacing-12) var(--spacing-6); }
+	.page > header { margin-bottom: var(--spacing-10); }
+	.page > header h1 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; }
+	.page > header p { color: var(--color-muted); margin-top: var(--spacing-2); }
+
+	.etf-block { margin-bottom: var(--spacing-10); }
+	.etf-head { display: flex; align-items: center; justify-content: space-between; padding: var(--spacing-4) 0; border-bottom: 1px solid var(--color-border-subtle); margin-bottom: var(--spacing-4); }
+	.etf-head .ticker { font-weight: 800; font-size: var(--font-size-xl); margin-right: var(--spacing-3); }
+	.etf-head .signal-label { font-weight: 600; }
+	.etf-head .signal-score { font-weight: 800; font-size: var(--font-size-2xl); }
+	.etf-head .suffix { color: var(--color-muted); font-weight: 400; font-size: 0.55em; margin-left: 4px; }
+
+	.hist { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); }
+	.hist th, .hist td { padding: var(--spacing-2) var(--spacing-3); border-bottom: 1px solid var(--color-border-subtle); text-align: left; vertical-align: top; }
+	.hist th { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); }
+	.hist td.summary { color: var(--color-text-secondary); max-width: 360px; }
+
+	.empty { color: var(--color-muted); }
+	.empty code { background: var(--color-surface); padding: 0 6px; border-radius: 4px; }
+
+	.callout { margin-top: var(--spacing-8); padding: var(--spacing-4); background: var(--color-surface); border-left: 3px solid var(--color-accent); border-radius: var(--radius); color: var(--color-text-secondary); }
+</style>

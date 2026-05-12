@@ -1,0 +1,196 @@
+{
+	"$schema": "https://emdashcms.com/seed.schema.json",
+	"version": "1",
+	"meta": {
+		"name": "AI Quant Signal",
+		"description": "AI 반도체 ETF AI 자동 리서치",
+		"author": "AI Quant Signal"
+	},
+	"settings": {
+		"title": "AI Quant Signal",
+		"tagline": "AI 반도체 ETF AI 자동 리서치"
+	},
+	"collections": [
+		{
+			"slug": "posts",
+			"label": "Posts",
+			"labelSingular": "Post",
+			"supports": ["drafts", "revisions", "search", "seo"],
+			"commentsEnabled": true,
+			"fields": [
+				{ "slug": "title", "label": "Title", "type": "string", "required": true, "searchable": true },
+				{ "slug": "featured_image", "label": "Featured Image", "type": "image" },
+				{ "slug": "content", "label": "Content", "type": "portableText", "searchable": true },
+				{ "slug": "excerpt", "label": "Excerpt", "type": "text" }
+			]
+		},
+		{
+			"slug": "pages",
+			"label": "Pages",
+			"labelSingular": "Page",
+			"supports": ["drafts", "revisions", "search"],
+			"fields": [
+				{ "slug": "title", "label": "Title", "type": "string", "required": true, "searchable": true },
+				{ "slug": "content", "label": "Content", "type": "portableText", "searchable": true }
+			]
+		},
+		{
+			"slug": "blog_posts",
+			"label": "Blog Posts (AI)",
+			"labelSingular": "Blog Post",
+			"supports": ["drafts", "revisions", "search", "seo"],
+			"fields": [
+				{ "slug": "title", "label": "제목", "type": "string", "required": true, "searchable": true },
+				{ "slug": "summary", "label": "요약", "type": "text", "searchable": true },
+				{ "slug": "content", "label": "본문", "type": "portableText", "searchable": true },
+				{ "slug": "seo_description", "label": "SEO 설명", "type": "text" },
+				{ "slug": "target_etf", "label": "타깃 ETF", "type": "string" },
+				{ "slug": "tickers", "label": "관련 티커 (쉼표 구분)", "type": "string" },
+				{ "slug": "sentiment", "label": "감성 (bullish/bearish/neutral)", "type": "string" },
+				{ "slug": "signal_score", "label": "시그널 점수 (0~10)", "type": "number" },
+				{ "slug": "signal_label", "label": "시그널 라벨", "type": "string" },
+				{ "slug": "source_news_url", "label": "원문 URL", "type": "string" },
+				{ "slug": "auto_generated", "label": "AI 자동 생성", "type": "boolean" }
+			]
+		},
+		{
+			"slug": "news_items",
+			"label": "News (수집)",
+			"labelSingular": "News Item",
+			"supports": ["drafts", "search"],
+			"fields": [
+				{ "slug": "title", "label": "제목", "type": "string", "required": true, "searchable": true },
+				{ "slug": "source", "label": "출처", "type": "string" },
+				{ "slug": "source_url", "label": "원문 URL", "type": "string" },
+				{ "slug": "raw_content", "label": "본문(원문)", "type": "text", "searchable": true },
+				{ "slug": "published_external_at", "label": "발행일 (원문)", "type": "datetime" },
+
+				{ "slug": "analyzed", "label": "GPT 분석 완료", "type": "boolean" },
+				{ "slug": "target_etf", "label": "영향 ETF", "type": "string" },
+				{ "slug": "tickers", "label": "관련 티커", "type": "string" },
+				{ "slug": "sentiment", "label": "감성 (bullish/bearish/neutral)", "type": "string" },
+				{ "slug": "score", "label": "GPT 점수 (0~10)", "type": "number" },
+				{ "slug": "importance", "label": "중요도 (low/medium/high)", "type": "string" },
+				{ "slug": "reason", "label": "분석 이유", "type": "text" }
+			]
+		},
+		{
+			"slug": "signals",
+			"label": "ETF Signals",
+			"labelSingular": "Signal",
+			"supports": ["drafts", "search"],
+			"fields": [
+				{ "slug": "title", "label": "제목", "type": "string", "required": true, "searchable": true },
+				{ "slug": "ticker", "label": "ETF 티커", "type": "string", "required": true },
+				{ "slug": "signal_label", "label": "시그널 (Strong Buy 등)", "type": "string" },
+				{ "slug": "score", "label": "종합 점수 (0~10)", "type": "number" },
+				{ "slug": "sentiment_score", "label": "감성 점수", "type": "number" },
+				{ "slug": "frequency_score", "label": "뉴스 빈도 점수", "type": "number" },
+				{ "slug": "momentum_score", "label": "모멘텀 점수", "type": "number" },
+				{ "slug": "volatility_score", "label": "변동성 점수", "type": "number" },
+				{ "slug": "summary", "label": "요약", "type": "text" },
+				{ "slug": "generated_at", "label": "생성 시각", "type": "datetime" }
+			]
+		},
+		{
+			"slug": "youtube_videos",
+			"label": "YouTube Videos",
+			"labelSingular": "YouTube Video",
+			"supports": ["drafts", "search"],
+			"fields": [
+				{ "slug": "title", "label": "제목", "type": "string", "required": true, "searchable": true },
+				{ "slug": "video_id", "label": "YouTube videoId", "type": "string", "required": true },
+				{ "slug": "channel", "label": "채널", "type": "string" },
+				{ "slug": "thumbnail", "label": "썸네일 URL", "type": "string" },
+				{ "slug": "description", "label": "원문 설명", "type": "text", "searchable": true },
+				{ "slug": "view_count", "label": "조회수", "type": "integer" },
+				{ "slug": "published_external_at", "label": "업로드 일시", "type": "datetime" },
+				{ "slug": "summary", "label": "GPT 요약", "type": "text", "searchable": true },
+				{ "slug": "sentiment", "label": "감성 (bullish/bearish/neutral)", "type": "string" },
+				{ "slug": "relevance", "label": "관련도 (0~1)", "type": "number" },
+				{ "slug": "score", "label": "Video Score (0~10)", "type": "number" },
+				{ "slug": "related_ticker", "label": "관련 ETF/Ticker", "type": "string" },
+				{ "slug": "keywords", "label": "검색 키워드", "type": "string" }
+			]
+		}
+	],
+	"taxonomies": [
+		{
+			"name": "category",
+			"label": "Categories",
+			"labelSingular": "Category",
+			"hierarchical": true,
+			"collections": ["posts", "blog_posts"],
+			"terms": [
+				{ "slug": "etf-research", "label": "ETF 리서치" },
+				{ "slug": "ai-semiconductor", "label": "AI 반도체" },
+				{ "slug": "market-update", "label": "시장 업데이트" },
+				{ "slug": "development", "label": "Development" },
+				{ "slug": "design", "label": "Design" },
+				{ "slug": "notes", "label": "Notes" }
+			]
+		},
+		{
+			"name": "tag",
+			"label": "Tags",
+			"labelSingular": "Tag",
+			"hierarchical": false,
+			"collections": ["posts", "blog_posts"],
+			"terms": [
+				{ "slug": "soxx", "label": "SOXX" },
+				{ "slug": "smh", "label": "SMH" },
+				{ "slug": "qqq", "label": "QQQ" },
+				{ "slug": "nvidia", "label": "NVIDIA" },
+				{ "slug": "amd", "label": "AMD" },
+				{ "slug": "tsmc", "label": "TSMC" },
+				{ "slug": "broadcom", "label": "Broadcom" },
+				{ "slug": "micron", "label": "Micron" },
+				{ "slug": "asml", "label": "ASML" },
+				{ "slug": "ai-chip", "label": "AI Chip" },
+				{ "slug": "hbm", "label": "HBM" },
+				{ "slug": "data-center", "label": "Data Center" },
+				{ "slug": "webdev", "label": "Web Development" },
+				{ "slug": "opinion", "label": "Opinion" },
+				{ "slug": "tools", "label": "Tools" },
+				{ "slug": "creativity", "label": "Creativity" }
+			]
+		}
+	],
+	"bylines": [
+		{
+			"id": "byline-aiquant",
+			"slug": "ai-quant-signal",
+			"displayName": "AI Quant Signal Research"
+		}
+	],
+	"menus": [
+		{
+			"name": "primary",
+			"label": "Primary Navigation",
+			"items": [
+				{ "type": "custom", "label": "홈", "url": "/" },
+				{ "type": "custom", "label": "시그널", "url": "/signals" },
+				{ "type": "custom", "label": "리서치 블로그", "url": "/blog" },
+				{ "type": "custom", "label": "뉴스", "url": "/news" },
+				{ "type": "custom", "label": "About", "url": "/pages/about" }
+			]
+		}
+	],
+	"widgetAreas": [
+		{
+			"name": "sidebar",
+			"label": "Sidebar",
+			"description": "ETF 리서치 사이드바",
+			"widgets": [
+				{ "type": "component", "componentId": "core:search", "title": "검색" },
+				{ "type": "component", "componentId": "core:tags", "title": "태그" },
+				{
+					"type": "component",
+					"componentId": "core:recent-posts",
+					"title": "최근 리서치",
+					"settings": { "count": 5, "showDate": true }
+				}
+			]
+		}
+	]
+}

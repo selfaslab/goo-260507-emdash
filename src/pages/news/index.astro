@@ -1,0 +1,102 @@
+---
+import { getEmDashCollection } from "emdash";
+import Base from "../../layouts/Base.astro";
+import { isDemoNewsUrl } from "../../lib/newsUrls.ts";
+
+const { entries: news, cacheHint } = await getEmDashCollection("news_items", {
+	orderBy: { created_at: "desc" },
+	limit: 100,
+	status: "published",
+});
+Astro.cache.set(cacheHint);
+
+const sentimentBadge = (s: string) => {
+	if (s === "bullish") return "background:#052e16;color:#4ade80;border-color:#14532d;";
+	if (s === "bearish") return "background:#450a0a;color:#fca5a5;border-color:#7f1d1d;";
+	return "background:#1e293b;color:#94a3b8;border-color:#334155;";
+};
+function fmt(d: Date | string | null | undefined) {
+	if (!d) return "";
+	const date = d instanceof Date ? d : new Date(d);
+	if (Number.isNaN(date.getTime())) return "";
+	return date.toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+---
+
+<Base title="AI 반도체 뉴스" description="자동 수집/분석된 AI 반도체 ETF 관련 뉴스 피드.">
+	<section class="page">
+		<header>
+			<h1>AI 반도체 뉴스</h1>
+			<p>
+				NewsAPI / Finnhub 에서 수집된 원문과 GPT-4o 가 분류한 ETF 영향도. API 키가 없으면 데모용 mock
+				만 들어가며, mock 은 실제 원문 링크가 없습니다.
+			</p>
+		</header>
+
+		{news.length === 0 ? (
+			<div class="empty">
+				<p>수집된 뉴스가 없습니다. <code>GET /api/fetch-news</code> 를 호출하세요.</p>
+			</div>
+		) : (
+			<ul class="news-list">
+				{news.map((n) => {
+					const d = n.data as any;
+					const demo = isDemoNewsUrl(d.source_url);
+					const inner = (
+						<>
+							<div class="meta">
+								{demo && <span class="chip demo">데모</span>}
+								{d.target_etf && <span class="chip">{d.target_etf}</span>}
+								{d.sentiment && <span class="chip" style={sentimentBadge(d.sentiment)}>{d.sentiment}</span>}
+								{typeof d.score === "number" && <span class="chip">{Number(d.score).toFixed(1)}/10</span>}
+								{d.importance && <span class="chip">{d.importance}</span>}
+								{d.source && <span class="chip muted">{d.source}</span>}
+								<span class="chip muted">{fmt(d.published_external_at ?? d.publishedAt ?? d.createdAt)}</span>
+							</div>
+							<h2>{d.title}</h2>
+							{demo && (
+								<p class="demo-hint">
+									실제 기사가 아닙니다. <code>NEWS_API_KEY</code> 또는 <code>FINNHUB_API_KEY</code> 를
+									설정한 뒤 뉴스를 다시 수집하면 원문으로 이동합니다.
+								</p>
+							)}
+							{d.reason && <p class="reason"><strong>분석:</strong> {d.reason}</p>}
+							{d.raw_content && <p class="raw">{String(d.raw_content).slice(0, 240)}…</p>}
+						</>
+					);
+					return (
+						<li>
+							{demo ? (
+								<div class="news-link news-link--demo">{inner}</div>
+							) : (
+								<a class="news-link" href={d.source_url || "#"} target="_blank" rel="noreferrer">
+									{inner}
+								</a>
+							)}
+						</li>
+					);
+				})}
+			</ul>
+		)}
+	</section>
+</Base>
+
+<style>
+	.page { max-width: 920px; margin: 0 auto; padding: var(--spacing-12) var(--spacing-6); }
+	.page > header { margin-bottom: var(--spacing-8); }
+	.page > header h1 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; }
+	.page > header p { color: var(--color-muted); margin-top: var(--spacing-2); }
+	.news-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--spacing-3); }
+	.news-link { display: block; padding: var(--spacing-4); border: 1px solid var(--color-border); border-radius: var(--radius-lg); text-decoration: none; color: inherit; }
+	.news-link:hover { background: var(--color-surface); }
+	.meta { display: flex; gap: var(--spacing-2); flex-wrap: wrap; margin-bottom: var(--spacing-2); }
+	.chip { display:inline-block; padding: 2px 8px; font-size: var(--font-size-xs); border-radius: 6px; background: var(--color-surface); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+	.chip.muted { color: var(--color-muted); }
+	.news-link h2 { font-size: var(--font-size-lg); font-weight: 700; margin: 0 0 var(--spacing-2); }
+	.reason, .raw { color: var(--color-text-secondary); margin: var(--spacing-1) 0; font-size: var(--font-size-sm); }
+	.news-link--demo { cursor: default; border-style: dashed; }
+	.chip.demo { border-color: #854d0e; color: #fbbf24; background: rgba(120, 53, 15, 0.25); }
+	.demo-hint { font-size: var(--font-size-xs); color: var(--color-muted); margin: 0 0 var(--spacing-2); }
+	.demo-hint code { font-size: 0.85em; }
+	.empty code { background: var(--color-surface); padding: 0 6px; border-radius: 4px; }
+</style>

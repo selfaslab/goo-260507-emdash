@@ -1,0 +1,81 @@
+---
+import { getEmDashCollection } from "emdash";
+import Base from "../../layouts/Base.astro";
+
+const { entries: posts, cacheHint } = await getEmDashCollection("blog_posts", {
+	orderBy: { created_at: "desc" },
+	limit: 50,
+	status: "published",
+});
+Astro.cache.set(cacheHint);
+
+const labelColor = (label: string) => {
+	if (label === "Strong Buy") return "color:#16a34a;";
+	if (label === "Buy") return "color:#4ade80;";
+	if (label === "Sell") return "color:#f97316;";
+	if (label === "Strong Sell") return "color:#dc2626;";
+	return "color:#94a3b8;";
+};
+function fmt(d: Date | string | null | undefined) {
+	if (!d) return "";
+	const date = d instanceof Date ? d : new Date(d);
+	if (Number.isNaN(date.getTime())) return "";
+	return date.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
+}
+---
+
+<Base title="AI 리서치 블로그" description="GPT 가 ETF 뉴스를 분석해 자동 생성한 한국어 투자 리서치 글.">
+	<section class="page">
+		<header>
+			<h1>AI 리서치 블로그</h1>
+			<p>SOXX · SMH · QQQ 와 AI 반도체 핵심 종목에 대한 자동 생성 리서치.</p>
+		</header>
+
+		{posts.length === 0 ? (
+			<div class="empty">
+				<p>아직 발행된 글이 없습니다.</p>
+				<p>
+					<code>POST /api/generate-blog</code> 를 호출하거나, EmDash Admin에서 <strong>blog_posts</strong> 컬렉션에 직접 글을 추가하세요.
+				</p>
+			</div>
+		) : (
+			<ul class="post-list">
+				{posts.map((p) => {
+					const d = p.data as any;
+					return (
+						<li class="post-card">
+							<a href={`/blog/${p.id}`} class="card-link">
+								<div class="card-meta">
+									{d.target_etf && <span class="chip">{d.target_etf}</span>}
+									{d.signal_label && <span class="chip" style={labelColor(d.signal_label)}>{d.signal_label}</span>}
+									{typeof d.signal_score === "number" && <span class="chip">{d.signal_score.toFixed(1)}/10</span>}
+									<span class="chip muted">{fmt(d.publishedAt ?? d.createdAt)}</span>
+								</div>
+								<h2>{d.title}</h2>
+								{d.summary && <p>{d.summary}</p>}
+							</a>
+						</li>
+					);
+				})}
+			</ul>
+		)}
+	</section>
+</Base>
+
+<style>
+	.page { max-width: 920px; margin: 0 auto; padding: var(--spacing-12) var(--spacing-6); }
+	.page > header { margin-bottom: var(--spacing-10); }
+	.page > header h1 { font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; }
+	.page > header p { color: var(--color-muted); margin-top: var(--spacing-2); }
+	.post-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--spacing-3); }
+	.post-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+	.card-link { display: block; padding: var(--spacing-5); text-decoration: none; color: inherit; }
+	.card-link:hover { background: var(--color-surface); border-radius: var(--radius-lg); }
+	.card-meta { display: flex; gap: var(--spacing-2); flex-wrap: wrap; margin-bottom: var(--spacing-2); }
+	.post-card h2 { font-size: var(--font-size-xl); font-weight: 700; margin: 0 0 var(--spacing-2); }
+	.post-card p { color: var(--color-text-secondary); margin: 0; }
+	.chip { display:inline-block; padding: 2px 8px; font-size: var(--font-size-xs); border-radius: 6px; background: var(--color-surface); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+	.chip.muted { color: var(--color-muted); }
+	.empty { padding: var(--spacing-6); border: 1px dashed var(--color-border); border-radius: var(--radius); color: var(--color-muted); }
+	.empty code { background: var(--color-surface); padding: 0 6px; border-radius: 4px; }
+</style>

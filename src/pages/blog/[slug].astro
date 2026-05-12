@@ -1,0 +1,115 @@
+---
+import { getEmDashEntry, getSeoMeta } from "emdash";
+import { PortableText } from "emdash/ui";
+import Base from "../../layouts/Base.astro";
+import RelatedVideosSection from "../../components/youtube/RelatedVideosSection.tsx";
+
+const { slug } = Astro.params;
+if (!slug) return Astro.redirect("/404");
+
+const { entry: post, cacheHint } = await getEmDashEntry("blog_posts", slug);
+if (!post) return Astro.redirect("/404");
+
+Astro.cache.set(cacheHint);
+
+const seo = getSeoMeta(post, {
+	siteTitle: "AI Quant Signal",
+	siteUrl: Astro.url.origin,
+	path: `/blog/${slug}`,
+});
+
+const d = post.data as any;
+
+// PortableText → plain text (GPT 키워드 추출용 컨텍스트)
+function ptToText(blocks: unknown): string {
+	if (!Array.isArray(blocks)) return "";
+	const out: string[] = [];
+	for (const b of blocks as Array<Record<string, unknown>>) {
+		const children = (b?.children as Array<Record<string, unknown>>) ?? [];
+		for (const c of children) {
+			if (typeof c?.text === "string") out.push(c.text);
+		}
+	}
+	return out.join("\n");
+}
+const postBodyText = `${d.summary ?? ""}\n${ptToText(d.content)}`.trim();
+const tickers = String(d.tickers ?? "")
+	.split(",")
+	.map((s) => s.trim())
+	.filter(Boolean);
+const labelColor = (label: string) => {
+	if (label === "Strong Buy") return "color:#16a34a;";
+	if (label === "Buy") return "color:#4ade80;";
+	if (label === "Sell") return "color:#f97316;";
+	if (label === "Strong Sell") return "color:#dc2626;";
+	return "color:#94a3b8;";
+};
+function fmt(d: Date | string | null | undefined) {
+	if (!d) return "";
+	const date = d instanceof Date ? d : new Date(d);
+	if (Number.isNaN(date.getTime())) return "";
+	return date.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
+}
+---
+
+<Base
+	title={seo.title}
+	description={seo.description ?? d.seo_description ?? d.summary}
+	type="article"
+	publishedTime={d.publishedAt ? new Date(d.publishedAt).toISOString() : undefined}
+	content={{ collection: "blog_posts", id: post.data.id, slug: post.id }}
+>
+	<article class="article">
+		<header>
+			<div class="meta">
+				{d.target_etf && <span class="chip">{d.target_etf}</span>}
+				{d.signal_label && <span class="chip" style={labelColor(d.signal_label)}>{d.signal_label}</span>}
+				{typeof d.signal_score === "number" && <span class="chip">{d.signal_score.toFixed(1)}/10</span>}
+				{d.sentiment && <span class="chip">{d.sentiment}</span>}
+				<span class="chip muted">{fmt(d.publishedAt ?? d.createdAt)}</span>
+				{d.auto_generated && <span class="chip muted">AI 자동 생성</span>}
+			</div>
+			<h1 {...post.edit?.title}>{d.title}</h1>
+			{d.summary && <p class="summary" {...post.edit?.summary}>{d.summary}</p>}
+		</header>
+
+		<div class="prose">
+			<PortableText value={d.content ?? []} />
+		</div>
+
+		{d.source_news_url && (
+			<aside class="source">
+				<strong>참고 원문:</strong>{" "}
+				<a href={d.source_news_url} target="_blank" rel="noreferrer">{d.source_news_url}</a>
+			</aside>
+		)}
+		<aside class="disclaimer">
+			본 글은 AI 가 생성한 참고용 리서치이며, 투자 권유가 아닙니다.
+		</aside>
+
+		<RelatedVideosSection
+			client:visible
+			postSlug={slug}
+			postTitle={d.title}
+			postBody={postBodyText}
+			targetEtf={d.target_etf}
+			tickers={tickers}
+			persist={false}
+		/>
+	</article>
+</Base>
+
+<style>
+	.article { max-width: 760px; margin: 0 auto; padding: var(--spacing-12) var(--spacing-6); }
+	.article header { margin-bottom: var(--spacing-8); }
+	.meta { display: flex; gap: var(--spacing-2); flex-wrap: wrap; margin-bottom: var(--spacing-3); }
+	.chip { display:inline-block; padding: 2px 8px; font-size: var(--font-size-xs); border-radius: 6px; background: var(--color-surface); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+	.chip.muted { color: var(--color-muted); }
+	.article h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; line-height: 1.15; }
+	.summary { font-size: var(--font-size-lg); color: var(--color-text-secondary); margin-top: var(--spacing-4); }
+	.prose { line-height: 1.8; }
+	.prose :global(h2) { margin-top: var(--spacing-8); font-size: var(--font-size-xl); font-weight: 700; }
+	.prose :global(p) { margin: var(--spacing-3) 0; }
+	.source, .disclaimer { margin-top: var(--spacing-6); padding: var(--spacing-3) var(--spacing-4); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+	.disclaimer { font-style: italic; color: var(--color-muted); }
+</style>

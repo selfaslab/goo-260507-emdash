@@ -1,0 +1,383 @@
+---
+import { getEmDashCollection, getSiteSettings } from "emdash";
+import Base from "../layouts/Base.astro";
+import { resolveBlogSiteIdentity } from "../utils/site-identity";
+import { ETF_TICKERS } from "../lib/config.ts";
+import { isDemoNewsUrl } from "../lib/newsUrls.ts";
+import { attachPipelineUserFromSession, isEmdashAdminUser } from "../lib/pipelineAccess.ts";
+
+await attachPipelineUserFromSession(Astro);
+const showAdminAutomation = isEmdashAdminUser(Astro.locals.user as { role?: unknown });
+
+const [
+	{ entries: signals, cacheHint: c1 },
+	{ entries: news, cacheHint: c2 },
+	{ entries: posts, cacheHint: c3 },
+	settings,
+] = await Promise.all([
+	getEmDashCollection("signals", {
+		orderBy: { created_at: "desc" },
+		limit: 30,
+		status: "published",
+	}),
+	getEmDashCollection("news_items", {
+		orderBy: { created_at: "desc" },
+		limit: 5,
+		status: "published",
+	}),
+	getEmDashCollection("blog_posts", {
+		orderBy: { created_at: "desc" },
+		limit: 5,
+		status: "published",
+	}),
+	getSiteSettings(),
+]);
+Astro.cache.set(c1);
+Astro.cache.set(c2);
+Astro.cache.set(c3);
+
+const { siteTitle, siteTagline } = resolveBlogSiteIdentity(settings);
+
+const latestSignalByEtf = new Map<string, any>();
+for (const s of signals) {
+	const t = (s.data as any).ticker as string;
+	if (!t) continue;
+	if (!latestSignalByEtf.has(t)) latestSignalByEtf.set(t, s);
+}
+
+const labelColor = (label: string) => {
+	if (label === "Strong Buy") return "color:#16a34a;";
+	if (label === "Buy") return "color:#4ade80;";
+	if (label === "Sell") return "color:#f97316;";
+	if (label === "Strong Sell") return "color:#dc2626;";
+	return "color:#94a3b8;";
+};
+const sentimentBadge = (s: string) => {
+	if (s === "bullish") return "background:#052e16;color:#4ade80;border-color:#14532d;";
+	if (s === "bearish") return "background:#450a0a;color:#fca5a5;border-color:#7f1d1d;";
+	return "background:#1e293b;color:#94a3b8;border-color:#334155;";
+};
+function fmt(d: Date | string | null | undefined) {
+	if (!d) return "";
+	const date = d instanceof Date ? d : new Date(d);
+	if (Number.isNaN(date.getTime())) return "";
+	return date.toLocaleString("ko-KR", {
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+}
+---
+
+<Base title={siteTitle} description={siteTagline}>
+	<section class="hero">
+		<h1>{siteTitle}</h1>
+		<p>{siteTagline}</p>
+		<div class="hero-actions">
+			<a href="/signals" class="btn btn-primary">시그널 대시보드</a>
+			<a href="/blog" class="btn">AI 리서치 블로그</a>
+			{showAdminAutomation && <a href="/admin/automation" class="btn">자동화</a>}
+			<a href="/_emdash/admin" class="btn btn-ghost">EmDash Admin</a>
+		</div>
+	</section>
+
+	<section class="section">
+		<header class="section-header">
+			<h2>오늘의 ETF 시그널</h2>
+			<a href="/signals">상세 →</a>
+		</header>
+		<div class="signal-grid">
+			{
+				ETF_TICKERS.map((etf) => {
+					const s = latestSignalByEtf.get(etf);
+					const data = s?.data as any | undefined;
+					return (
+						<article class="signal-card">
+							<div class="signal-card-head">
+								<span class="ticker">{etf}</span>
+								<span class="signal-label" style={labelColor(data?.signal_label ?? "")}>
+									{data?.signal_label ?? "데이터 없음"}
+								</span>
+							</div>
+							<div class="signal-score">
+								{typeof data?.score === "number" ? data.score.toFixed(1) : "—"}
+								<span class="score-suffix">/ 10</span>
+							</div>
+							<dl class="signal-detail">
+								<div>
+									<dt>감성</dt>
+									<dd>{typeof data?.sentiment_score === "number" ? data.sentiment_score.toFixed(1) : "—"}</dd>
+								</div>
+								<div>
+									<dt>빈도</dt>
+									<dd>{typeof data?.frequency_score === "number" ? data.frequency_score.toFixed(1) : "—"}</dd>
+								</div>
+								<div>
+									<dt>모멘텀</dt>
+									<dd>{typeof data?.momentum_score === "number" ? data.momentum_score.toFixed(1) : "—"}</dd>
+								</div>
+								<div>
+									<dt>변동성</dt>
+									<dd>{typeof data?.volatility_score === "number" ? data.volatility_score.toFixed(1) : "—"}</dd>
+								</div>
+							</dl>
+							<p class="signal-summary">{data?.summary ?? "아직 분석된 뉴스가 없습니다."}</p>
+						</article>
+					);
+				})
+			}
+		</div>
+	</section>
+
+	<div class="two-col">
+		<section class="section flush">
+			<header class="section-header">
+				<h2>오늘의 AI 반도체 뉴스</h2>
+				<a href="/news">전체 →</a>
+			</header>
+			{news.length === 0 ? (
+				<div class="empty-state">
+					<p>수집된 뉴스가 없습니다.</p>
+					<small>
+						<code>GET /api/fetch-news</code> 호출 또는 Admin에서 직접 추가하세요.
+					</small>
+				</div>
+			) : (
+				<ul class="news-list">
+					{news.map((n) => {
+						const d = n.data as any;
+						const demo = isDemoNewsUrl(d.source_url);
+						const inner = (
+							<>
+								<span class="news-title">{d.title}</span>
+								<div class="news-meta">
+									{demo && <span class="chip demo">데모</span>}
+									{d.target_etf && <span class="chip">{d.target_etf}</span>}
+									{d.sentiment && (
+										<span class="chip" style={sentimentBadge(d.sentiment)}>
+											{d.sentiment}
+										</span>
+									)}
+									{typeof d.score === "number" && (
+										<span class="chip">{Number(d.score).toFixed(1)}/10</span>
+									)}
+									{d.source && <span class="chip muted">{d.source}</span>}
+									<span class="chip muted">{fmt(d.published_external_at ?? d.publishedAt ?? d.createdAt)}</span>
+								</div>
+							</>
+						);
+						return (
+							<li>
+								{demo ? (
+									<div class="news-item news-item--demo">{inner}</div>
+								) : (
+									<a class="news-item" href={d.source_url || "#"} target="_blank" rel="noreferrer">
+										{inner}
+									</a>
+								)}
+							</li>
+						);
+					})}
+				</ul>
+			)}
+		</section>
+
+		<section class="section flush">
+			<header class="section-header">
+				<h2>자동 생성 리서치 블로그</h2>
+				<a href="/blog">전체 →</a>
+			</header>
+			{posts.length === 0 ? (
+				<div class="empty-state">
+					<p>생성된 블로그 글이 없습니다.</p>
+					<small>
+						<code>POST /api/generate-blog</code> 로 자동 생성하거나 Admin에서 추가하세요.
+					</small>
+				</div>
+			) : (
+				<ul class="post-list">
+					{posts.map((p) => {
+						const d = p.data as any;
+						return (
+							<li>
+								<a href={`/blog/${p.id}`}>
+									<span class="post-title">{d.title}</span>
+									<p class="post-summary">{d.summary}</p>
+									<div class="post-meta">
+										{d.target_etf && <span class="chip">{d.target_etf}</span>}
+										{d.signal_label && (
+											<span class="chip" style={labelColor(d.signal_label)}>
+												{d.signal_label}
+											</span>
+										)}
+										{typeof d.signal_score === "number" && (
+											<span class="chip">{d.signal_score.toFixed(1)}/10</span>
+										)}
+										<span class="chip muted">{fmt(d.publishedAt ?? d.createdAt)}</span>
+									</div>
+								</a>
+							</li>
+						);
+					})}
+				</ul>
+			)}
+		</section>
+	</div>
+</Base>
+
+<style>
+	.hero {
+		max-width: var(--wide-width);
+		margin: 0 auto;
+		padding: var(--spacing-16) var(--spacing-6) var(--spacing-8);
+		text-align: center;
+	}
+	.hero h1 {
+		font-size: clamp(2rem, 4vw, 3rem);
+		font-weight: 800;
+		letter-spacing: -0.02em;
+	}
+	.hero p {
+		color: var(--color-muted);
+		margin-top: var(--spacing-3);
+	}
+	.hero-actions {
+		display: flex;
+		gap: var(--spacing-3);
+		justify-content: center;
+		margin-top: var(--spacing-6);
+		flex-wrap: wrap;
+	}
+	.btn {
+		display: inline-block;
+		padding: var(--spacing-3) var(--spacing-5);
+		border-radius: var(--radius);
+		font-size: var(--font-size-sm);
+		text-decoration: none;
+		color: var(--color-text);
+		border: 1px solid var(--color-border);
+		background: var(--color-surface);
+		transition: background var(--transition-fast);
+	}
+	.btn:hover { background: var(--color-border); }
+	.btn-primary {
+		background: var(--color-accent);
+		color: var(--color-on-accent);
+		border-color: transparent;
+	}
+	.btn-primary:hover { background: var(--color-accent-hover); }
+	.btn-ghost { background: transparent; }
+
+	.section {
+		max-width: var(--wide-width);
+		margin: 0 auto;
+		padding: var(--spacing-8) var(--spacing-6);
+	}
+	.section.flush { padding: var(--spacing-6) 0; }
+	.section-header {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		border-bottom: 1px solid var(--color-border-subtle);
+		padding-bottom: var(--spacing-3);
+		margin-bottom: var(--spacing-6);
+	}
+	.section-header h2 { font-size: var(--font-size-xl); font-weight: 700; }
+	.section-header a { font-size: var(--font-size-sm); color: var(--color-accent); text-decoration: none; }
+
+	.signal-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: var(--spacing-4);
+	}
+	.signal-card {
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		padding: var(--spacing-5);
+		background: var(--color-surface);
+	}
+	.signal-card-head { display: flex; justify-content: space-between; align-items: center; }
+	.ticker { font-weight: 800; font-size: var(--font-size-lg); letter-spacing: 0.02em; }
+	.signal-label { font-size: var(--font-size-sm); font-weight: 600; }
+	.signal-score {
+		font-size: clamp(2rem, 4vw, 2.6rem);
+		font-weight: 800;
+		margin: var(--spacing-3) 0;
+	}
+	.score-suffix { color: var(--color-muted); font-size: 0.5em; font-weight: 400; margin-left: 4px; }
+	.signal-detail {
+		display: grid;
+		grid-template-columns: repeat(4, 1fr);
+		gap: var(--spacing-2);
+		margin: 0 0 var(--spacing-3);
+	}
+	.signal-detail dt { font-size: var(--font-size-xs); color: var(--color-muted); margin: 0; }
+	.signal-detail dd { font-size: var(--font-size-sm); font-weight: 600; margin: 0; }
+	.signal-summary { color: var(--color-text-secondary); font-size: var(--font-size-sm); margin: 0; }
+
+	.two-col {
+		max-width: var(--wide-width);
+		margin: 0 auto;
+		padding: 0 var(--spacing-6) var(--spacing-16);
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--spacing-6);
+	}
+
+	.empty-state {
+		padding: var(--spacing-6);
+		border: 1px dashed var(--color-border);
+		border-radius: var(--radius);
+		color: var(--color-muted);
+	}
+	.empty-state code {
+		font-family: var(--font-mono, monospace);
+		background: var(--color-surface);
+		padding: 0 6px;
+		border-radius: 4px;
+	}
+
+	.news-list, .post-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--spacing-2); }
+	.news-list a,
+	.news-list .news-item,
+	.post-list a {
+		display: block;
+		padding: var(--spacing-3);
+		text-decoration: none;
+		color: inherit;
+		border-radius: var(--radius);
+		transition: background var(--transition-fast);
+	}
+	.news-list a:hover,
+	.post-list a:hover {
+		background: var(--color-surface);
+	}
+	.news-list .news-item--demo {
+		cursor: default;
+		border: 1px dashed var(--color-border);
+	}
+	.chip.demo {
+		border-color: #854d0e;
+		color: #fbbf24;
+		background: rgba(120, 53, 15, 0.25);
+	}
+	.news-title, .post-title { font-weight: 600; display: block; }
+	.news-meta, .post-meta { display: flex; gap: var(--spacing-2); flex-wrap: wrap; margin-top: var(--spacing-2); }
+	.post-summary { color: var(--color-text-secondary); margin: var(--spacing-2) 0 0; font-size: var(--font-size-sm); }
+	.chip {
+		display: inline-block;
+		padding: 2px 8px;
+		font-size: var(--font-size-xs);
+		border-radius: 6px;
+		background: var(--color-surface);
+		color: var(--color-text-secondary);
+		border: 1px solid var(--color-border);
+	}
+	.chip.muted { color: var(--color-muted); }
+
+	@media (max-width: 900px) {
+		.signal-grid { grid-template-columns: 1fr; }
+		.two-col { grid-template-columns: 1fr; }
+	}
+</style>

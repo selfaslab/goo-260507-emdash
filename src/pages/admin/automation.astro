@@ -1,0 +1,175 @@
+---
+import { getSiteSettings } from "emdash";
+import Base from "../../layouts/Base.astro";
+import { resolveBlogSiteIdentity } from "../../utils/site-identity";
+import { attachPipelineUserFromSession, isEmdashAdminUser } from "../../lib/pipelineAccess.ts";
+
+await attachPipelineUserFromSession(Astro);
+const pipelineUser = Astro.locals.user as { role?: unknown } | undefined;
+if (!isEmdashAdminUser(pipelineUser)) {
+	if (pipelineUser) return Astro.redirect("/");
+	return Astro.redirect("/_emdash/admin/login");
+}
+
+const settings = await getSiteSettings();
+const { siteTitle } = resolveBlogSiteIdentity(settings);
+---
+
+<Base title={`관리자 자동화 — ${siteTitle}`} description="뉴스 수집·분석·블로그 발행을 한 번에 실행합니다.">
+	<section class="wrap">
+		<h1>관리자 자동화</h1>
+		<p class="lead">
+			<code>/api/fetch-news</code> → <code>/api/analyze-news</code> → <code>/api/generate-blog</code> 를 순서대로 돌립니다. EmDash
+			관리자에 로그인한 브라우저에서만 버튼이 동작합니다.
+		</p>
+
+		<div class="panel">
+			<label class="row">
+				<input type="checkbox" id="opt-mock" checked />
+				<span>Mock 뉴스 중복 제거 후 다시 수집 (데모 키 없을 때 날짜 갱신에 유리)</span>
+			</label>
+			<label class="row">
+				<input type="checkbox" id="opt-blog" checked />
+				<span>리서치 블로그 3편(SOXX/SMH/QQQ) 생성·<strong>즉시 발행</strong> (OpenAI 비용 발생)</span>
+			</label>
+			<label class="row">
+				<input type="checkbox" id="opt-publish" checked />
+				<span>블로그 발행 켜기 (위 옵션과 함께 사용)</span>
+			</label>
+
+			<button type="button" id="btn-run" class="btn btn-primary">최신 뉴스 파이프라인 실행</button>
+			<p id="status" class="status" aria-live="polite"></p>
+			<pre id="out" class="out" hidden></pre>
+		</div>
+
+		<p class="hint-host">
+			<strong>401 이 나오면:</strong> <code>/_emdash/admin</code>에 로그인할 때 쓴 주소와 동일한지 확인하세요. (<code>http://localhost:4321</code> 과
+			<code>http://127.0.0.1:4321</code> 은 쿠키가 따로라 한쪽만 로그인된 것처럼 보일 수 있습니다.)
+		</p>
+		<p class="hint">
+			CLI / Cron 은 <code>POST /api/admin/run-news-pipeline</code> 에 <code>X-Cron-Secret</code> 또는
+			<code>X-Admin-Pipeline-Secret</code>(<code>.env</code>의 <code>ADMIN_PIPELINE_SECRET</code>)을 넣어 호출할 수 있습니다.
+		</p>
+	</section>
+</Base>
+
+<script>
+	const el = document.getElementById("btn-run");
+	const statusEl = document.getElementById("status");
+	const outEl = document.getElementById("out");
+	const optMock = document.getElementById("opt-mock");
+	const optBlog = document.getElementById("opt-blog");
+	const optPublish = document.getElementById("opt-publish");
+
+	if (el instanceof HTMLButtonElement) {
+		const btn = el;
+		btn.addEventListener("click", async () => {
+			if (!statusEl || !outEl || !optMock || !optBlog || !optPublish) return;
+			statusEl.textContent = "실행 중… (수십 초 걸릴 수 있습니다)";
+			outEl.hidden = true;
+			btn.disabled = true;
+			try {
+				const res = await fetch("/api/admin/run-news-pipeline", {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						"X-EmDash-Request": "1",
+					},
+					credentials: "include",
+					body: JSON.stringify({
+						maxNews: 30,
+						analyzeLimit: 30,
+						refreshMockDuplicates: optMock instanceof HTMLInputElement && optMock.checked,
+						runBlog: optBlog instanceof HTMLInputElement && optBlog.checked,
+						publishBlog: optPublish instanceof HTMLInputElement && optPublish.checked,
+					}),
+				});
+				const text = await res.text();
+				outEl.textContent = text;
+				outEl.hidden = false;
+				if (res.ok) {
+					statusEl.textContent = "완료";
+				} else {
+					statusEl.textContent = `오류 HTTP ${res.status}`;
+				}
+			} catch (e) {
+				statusEl.textContent = e instanceof Error ? e.message : String(e);
+			} finally {
+				btn.disabled = false;
+			}
+		});
+	}
+</script>
+
+<style>
+	.wrap {
+		max-width: 52rem;
+		margin: 0 auto;
+		padding: 2rem 1.25rem 4rem;
+	}
+	h1 {
+		font-size: 1.75rem;
+		margin-bottom: 0.5rem;
+	}
+	.lead {
+		color: var(--muted, #94a3b8);
+		line-height: 1.6;
+		margin-bottom: 1.5rem;
+	}
+	.lead code {
+		font-size: 0.85em;
+	}
+	.panel {
+		border: 1px solid var(--border, #334155);
+		border-radius: 0.75rem;
+		padding: 1.25rem 1.5rem;
+		background: var(--panel, rgba(15, 23, 42, 0.5));
+	}
+	.row {
+		display: flex;
+		gap: 0.6rem;
+		align-items: flex-start;
+		margin-bottom: 0.75rem;
+		cursor: pointer;
+		line-height: 1.45;
+	}
+	.row input {
+		margin-top: 0.2rem;
+	}
+	#btn-run {
+		margin-top: 1rem;
+	}
+	.status {
+		margin-top: 1rem;
+		font-size: 0.95rem;
+		color: var(--muted, #94a3b8);
+	}
+	.out {
+		margin-top: 0.75rem;
+		padding: 1rem;
+		border-radius: 0.5rem;
+		background: #0f172a;
+		color: #e2e8f0;
+		font-size: 0.8rem;
+		overflow-x: auto;
+		max-height: 24rem;
+	}
+	.hint-host {
+		margin-top: 1.25rem;
+		font-size: 0.9rem;
+		color: var(--color-text-secondary, #cbd5e1);
+		line-height: 1.5;
+	}
+	.hint-host code {
+		font-size: 0.85em;
+	}
+	.hint {
+		margin-top: 2rem;
+		font-size: 0.85rem;
+		color: var(--muted, #64748b);
+		line-height: 1.5;
+	}
+	.hint code {
+		font-size: 0.82em;
+	}
+</style>
