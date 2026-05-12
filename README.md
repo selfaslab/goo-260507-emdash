@@ -1,8 +1,12 @@
+
 # AI 퀀트 시그널 (AI Quant Signal)
 
 > EmDash CMS 기반 AI 반도체 ETF 리서치 & 자동화 블로그 시스템 — Astro + EmDash + GPT-4o + SQLite
 
 뉴스 수집 → ETF 영향 분석 → 퀀트 시그널 점수 → 한국어 SEO 리서치 블로그 자동 생성까지의 파이프라인을 모두 한 Astro 앱 안에서 운영합니다.
+
+<img width="973" height="796" alt="quent2" src="https://github.com/user-attachments/assets/7381c286-54ef-46c3-b3ec-0e82b611e29f" />
+
 
 ## 프로젝트 소개 (MVP · 바이브코딩)
 
@@ -28,6 +32,9 @@ corepack pnpm dev           # http://localhost:4321
 - 수집 뉴스 피드: <http://localhost:4321/news>
 - EmDash 어드민: <http://localhost:4321/_emdash/admin>
 - 관리자 자동화(뉴스·시그널·블로그, **관리자 로그인 후에만** 접근): <http://localhost:4321/admin/automation>
+
+<img width="1230" height="1300" alt="quent1" src="https://github.com/user-attachments/assets/2d3802f6-108a-4bae-85dc-6dcbce2258a1" />
+
 
 ## 환경 변수
 
@@ -60,6 +67,9 @@ corepack pnpm dev           # http://localhost:4321
 - `youtube_videos` — 블로그 하단 추천 영상 캐시 (video_id/title/channel/thumbnail/summary/sentiment/relevance/score/related_ticker/keywords)
 - 기존 `posts`, `pages` 도 유지 (블로그 템플릿 호환).
 
+<img width="931" height="717" alt="quent3" src="https://github.com/user-attachments/assets/7692fadb-2f0b-4051-b821-2fddf57c9060" />
+
+
 ## 자동화 파이프라인
 
 관리자는 브라우저에서 **`/admin/automation`** 으로 들어가 한 번에 실행할 수 있습니다. (EmDash 관리자 로그인 세션 필요)
@@ -81,13 +91,7 @@ curl -X POST http://localhost:4321/api/analyze-news \
 
 `news_items.analyzed=false` 인 항목을 GPT-4o 로 분석해 `target_etf/sentiment/score/importance/reason` 을 채우고, 그 결과를 ETF 단위로 집계해 `signals` 컬렉션에 새 시그널을 생성합니다.
 
-점수 공식:
-
-```
-Signal Score = 0.4·Sentiment + 0.2·Frequency + 0.3·Momentum + 0.1·Volatility
-```
-
-라벨 임계값: 8↑ Strong Buy · 6↑ Buy · 4↑ Neutral · 2↑ Sell · 그 미만 Strong Sell.
+<img width="607" height="820" alt="quent4" src="https://github.com/user-attachments/assets/af1a4a7a-44dd-4928-af5d-d50d473691cd" />
 
 ### 3) 블로그 자동 생성
 
@@ -191,9 +195,4 @@ src/
 └── layouts, components, styles, utils  # EmDash blog 템플릿 그대로
 ```
 
-## 향후 확장 (PHASE 9+)
 
-- **백테스트**: Alpha Vantage 등에서 ETF 종가를 받아 `signals.generated_at` 기준 N일 수익률을 측정.
-- **유튜브/Reddit/X 감성**: 추가 수집 어댑터를 `src/services/` 에 붙이고 `news_items` 에 source 별 다른 가중치 부여.
-- **이메일 리포트**: EmDash 의 SEO 플러그인/`@emdash-cms/plugin-audit-log` 와 결합해 일일 리서치 자동 발송.
-- **AI 썸네일 생성**: blog post 생성 시 `dall-e` / `gpt-image-1` 호출하여 `featured_image` 자동 업로드.
